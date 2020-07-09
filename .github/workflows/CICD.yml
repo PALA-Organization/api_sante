@@ -34,66 +34,34 @@ jobs:
         run: mvn -B package --file pom.xml
 
       - name: Build Docker image
-        run: docker build . --tag jee-server:dev
-
-  publish-dev-image:
-    needs: build-dev
-    runs-on: self-hosted
-    steps:
-      - name: Log-in on Docker repository
-        env:
-          DOCKERIO_USERNAME: ${{ secrets.DOCKERIO_USERNAME }}
-          DOCKERIO_PASSWORD: ${{ secrets.DOCKERIO_PASSWORD }}  
-        run: |
-          docker login -u "$DOCKERIO_USERNAME" -p "$DOCKERIO_PASSWORD"
-
-      - name: Tag of the new image
-        run: docker tag jee-server:dev alexandrebis/4al2-jee-project:dev
-
-      - name: Push of the new image
-        run: docker push alexandrebis/4al2-jee-project:dev
+        run: docker build . --tag jee-api-sante:dev
 
   deploy-dev:
     needs: build-dev
     runs-on: self-hosted
     steps:
       - name: Stop previous Docker image
-        run:  (docker stop jee-server || echo "Container already stopped") && (docker rm jee-server || echo "Image already removed")
+        run:  (docker stop jee-api-sante || echo "Container already stopped") && (docker rm jee-api-sante || echo "Image already removed")
 
       - name: Launch new Docker image
-        run: docker run -d -p 8080:8080 --name "jee-server" jee-server:dev
+        env:
+          OCR_TOKEN: ${{ secrets.OCR_TOKEN }}
+        run: |
+          docker run -d -p ${{ secrets.DEV_PORT }}:8080 -e OCR_TOKEN --name "jee-api-sante" jee-api-sante:dev
 
-  build-prod:
+  deploy-prod:
     needs: test
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: self-hosted
     steps:
-      - name: Build with Maven
-        run: mvn -B package --file pom.xml
+      - name: Initliaze AWS env
+        run: eb use ${{ secrets.AWS_ENVIRONMENT_NAME }}
 
-      - name: Build Docker image
-        run: docker build . --tag jee-server:prod
-
-  publish-prod-image:
-    needs: build-prod
-    runs-on: self-hosted
-    steps:
-      - name: Log-in on Docker repository
+      - name: Set env vars
         env:
-          DOCKERIO_USERNAME: ${{ secrets.DOCKERIO_USERNAME }}
-          DOCKERIO_PASSWORD: ${{ secrets.DOCKERIO_PASSWORD }}
-        run: |
-          docker login -u "$DOCKERIO_USERNAME" -p "$DOCKERIO_PASSWORD"
+          OCR_TOKEN: ${{ secrets.OCR_TOKEN }}
+        run: eb setenv OCR_TOKEN=$OCR_TOKEN
 
-      - name: Tag of the new image
-        run: docker tag jee-server:prod alexandrebis/4al2-jee-project:prod
+      - name: Deploy on EB
+        run: eb deploy ${{ secrets.AWS_ENVIRONMENT_NAME }}
 
-      - name: Push of the new image
-        run: docker push alexandrebis/4al2-jee-project:prod
-
-  deploy-prod:
-    needs: [build-prod, publish-prod-image]
-    runs-on: self-hosted
-    steps: 
-      - name: TODO
-        run: echo "TODO Deploy the image to Beanstalk"
