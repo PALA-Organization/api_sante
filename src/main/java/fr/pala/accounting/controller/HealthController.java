@@ -27,12 +27,6 @@ public class HealthController implements ErrorController {
         return PATH;
     }
 
-
-    @GetMapping("/health2")
-    public ResponseEntity health2() {
-        return ResponseEntity.ok("Hello");
-    }
-
     @RequestMapping("/healthCheck")
     public ResponseEntity checkHealth() {
 
